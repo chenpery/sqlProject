@@ -19,33 +19,51 @@ def createTables():
         conn = Connector.DBConnector()
         conn.execute(
             "BEGIN;" +
-            "DROP TABLE IF EXISTS CriticTable CASCADE; CREATE TABLE CriticTable(critic_id INTEGER NOT NULL, name TEXT NOT NULL," +
+            # CriticTable
+            "DROP TABLE IF EXISTS CriticTable CASCADE; " +
+            "CREATE TABLE CriticTable(critic_id INTEGER NOT NULL, name TEXT NOT NULL," +
             "PRIMARY KEY(critic_id), CHECK(critic_id>0));" +
-            "DROP TABLE IF EXISTS MovieTable CASCADE; CREATE TABLE MovieTable(movie_name TEXT NOT NULL, year INTEGER NOT NULL, genre TEXT NOT NULL," +
+            # MovieTable
+            "DROP TABLE IF EXISTS MovieTable CASCADE; " +
+            "CREATE TABLE MovieTable(movie_name TEXT NOT NULL, year INTEGER NOT NULL, genre TEXT NOT NULL," +
             "PRIMARY KEY(movie_name, year), CHECK(year>= 1895), CHECK(genre = \'Drama\' OR genre=\'Action\' OR genre=\'Comedy\' OR genre=\'Horror\'));" +
-            "DROP TABLE IF EXISTS ActorTable CASCADE; CREATE TABLE ActorTable(actor_id INTEGER NOT NULL, name TEXT NOT NULL, age INTEGER NOT NULL, height INTEGER NOT NULL," +
+            # ActorTable
+            "DROP TABLE IF EXISTS ActorTable CASCADE; " +
+            "CREATE TABLE ActorTable(actor_id INTEGER NOT NULL, name TEXT NOT NULL, age INTEGER NOT NULL, height INTEGER NOT NULL," +
             "PRIMARY KEY(actor_id), CHECK(actor_id > 0 AND age > 0 AND height > 0));" +
-            "DROP TABLE IF EXISTS StudioTable CASCADE; CREATE TABLE StudioTable(studio_id INTEGER NOT NULL, name TEXT NOT NULL," +
+            # StudioTable
+            "DROP TABLE IF EXISTS StudioTable CASCADE; " +
+            "CREATE TABLE StudioTable(studio_id INTEGER NOT NULL, name TEXT NOT NULL," +
             "PRIMARY KEY(studio_id), CHECK(studio_id > 0));" +
-            "DROP TABLE IF EXISTS CriticMovieRela CASCADE; CREATE TABLE CriticMovieRela(critic_id INTEGER NOT NULL, movie_name TEXT NOT NULL, year INTEGER NOT NULL, rating INTEGER NOT NULL," +
+            # CriticMovieRela
+            "DROP TABLE IF EXISTS CriticMovieRela CASCADE; " +
+            "CREATE TABLE CriticMovieRela(critic_id INTEGER NOT NULL, movie_name TEXT NOT NULL, year INTEGER NOT NULL, rating INTEGER NOT NULL," +
             "FOREIGN KEY(critic_id) REFERENCES CriticTable(critic_id) ON DELETE CASCADE," +
             "FOREIGN KEY(movie_name, year) REFERENCES MovieTable(movie_name, year) ON DELETE CASCADE," +
             "UNIQUE (critic_id, movie_name, year), CHECK(rating >=1 and rating <= 5));" +
-            "DROP TABLE IF EXISTS ActorInMovieRela CASCADE; CREATE TABLE ActorInMovieRela(movie_name TEXT NOT NULL, year INTEGER NOT NULL, actor_id INTEGER NOT NULL, salary INTEGER NOT NULL," +
+            # ActorInMovieRela
+            "DROP TABLE IF EXISTS ActorInMovieRela CASCADE; " +
+            "CREATE TABLE ActorInMovieRela(movie_name TEXT NOT NULL, year INTEGER NOT NULL, actor_id INTEGER NOT NULL, salary INTEGER NOT NULL," +
             "FOREIGN KEY(actor_id) REFERENCES ActorTable(actor_id) ON DELETE CASCADE," +
             "FOREIGN KEY(movie_name,year) REFERENCES MovieTable(movie_name, year) ON DELETE CASCADE," +
             "PRIMARY KEY (movie_name,year,actor_id), CHECK(salary > 0));" +
-            "DROP TABLE IF EXISTS ActorRoleInMovieRela CASCADE; CREATE TABLE ActorRoleInMovieRela(movie_name TEXT NOT NULL, year INTEGER NOT NULL, actor_id INTEGER NOT NULL, roles TEXT NOT NULL," +
-            "FOREIGN KEY(movie_name, year, actor_id) REFERENCES ActorInMovieRela(movie_name, year, actor_id) ON DELETE CASCADE);" +
-            "DROP TABLE IF EXISTS MovieInStudioRela CASCADE; CREATE TABLE MovieInStudioRela(studio_id  INTEGER NOT NULL, movie_name TEXT NOT NULL, year INTEGER NOT NULL, budget INTEGER, revenue INTEGER default(0)," +
+            # ActorRoleInMovieRela
+            "DROP TABLE IF EXISTS ActorRoleInMovieRela CASCADE; " +
+            "CREATE TABLE ActorRoleInMovieRela(movie_name TEXT NOT NULL, year INTEGER NOT NULL, actor_id INTEGER NOT NULL, roles TEXT NOT NULL," +
+            "FOREIGN KEY(movie_name, year, actor_id) REFERENCES ActorInMovieRela(movie_name, year, actor_id) ON DELETE CASCADE," +
+            "UNIQUE(movie_name, year, actor_id, roles));" +
+            # MovieInStudioRela
+            "DROP TABLE IF EXISTS MovieInStudioRela CASCADE; " +
+            "CREATE TABLE MovieInStudioRela(studio_id  INTEGER NOT NULL, movie_name TEXT NOT NULL, year INTEGER NOT NULL, budget INTEGER NOT NULL, revenue INTEGER NOT NULL," +
             "FOREIGN KEY(studio_id) REFERENCES StudioTable(studio_id) ON DELETE CASCADE," +
             "FOREIGN KEY(movie_name,year) REFERENCES MovieTable(movie_name, year) ON DELETE CASCADE," +
-            "UNIQUE (studio_id, movie_name,year), CHECK(budget >= 0), CHECK( revenue >= 0));" +
+            "UNIQUE(studio_id, movie_name,year), CHECK(budget >= 0), CHECK( revenue >= 0));" +
+            # VIEWS
             "DROP VIEW IF EXISTS NumRolesInMovieXActor CASCADE; CREATE VIEW NumRolesInMovieXActor AS SELECT actor_id, movie_name, year, COUNT(roles) AS roles_num FROM ActorRoleInMovieRela GROUP BY actor_id, movie_name, year;" +
-            "DROP VIEW IF EXISTS MovieAvgRate CASCADE; CREATE VIEW MovieAvgRate AS SELECT movie_name, year, AVG(rating) FROM CriticMovieRela GROUP BY movie_name, year;" +
-            "DROP VIEW IF EXISTS MovieRevenues CASCADE; CREATE VIEW MovieRevenues AS SELECT movie_name, year, SUM(revenue) AS revenue FROM MovieInStudioRela GROUP BY movie_name, year;" +
+            "DROP VIEW IF EXISTS MovieAvgRate CASCADE; CREATE VIEW MovieAvgRate AS SELECT movie_name, year, AVG(rating) AS rating_avg FROM CriticMovieRela GROUP BY movie_name, year;" +
+            "DROP VIEW IF EXISTS MovieRevenues CASCADE; CREATE VIEW MovieRevenues AS SELECT movie_name, SUM(revenue) AS revenue FROM MovieInStudioRela GROUP BY movie_name;" +
             "DROP VIEW IF EXISTS StudioRevenues CASCADE; CREATE VIEW StudioRevenues AS SELECT studio_id, year, SUM(revenue) AS revenue FROM MovieInStudioRela GROUP BY studio_id, year;" +
-            # "DROP VIEW IF EXISTS CtiticToStudio CASCADE; CREATE VIEW CtiticToStudio AS SELECT critic_id, studio_id, COUNT(movie_name) AS movies_num FROM CriticMovieRela INNER JOIN MovieInStudioRela ON (CriticMovieRela.movie_name,CriticMovieRela.year)=(MovieInStudioRela.movie_name,MovieInStudioRela.year) GROUP BY critic_id, studio_id;" +
+            #"DROP VIEW IF EXISTS CtiticToStudio CASCADE; CREATE VIEW CtiticToStudio AS SELECT critic_id, studio_id, COUNT(movie_name) AS movies_num FROM CriticMovieRela INNER JOIN MovieInStudioRela ON (CriticMovieRela.movie_name,CriticMovieRela.year)=(MovieInStudioRela.movie_name,MovieInStudioRela.year) GROUP BY critic_id, studio_id;" +
             "DROP VIEW IF EXISTS CtiticToStudio CASCADE; CREATE VIEW CtiticToStudio AS SELECT critic_id, studio_id, COUNT(*) AS movies_num FROM CriticMovieRela INNER JOIN MovieInStudioRela ON (CriticMovieRela.movie_name,CriticMovieRela.year)=(MovieInStudioRela.movie_name,MovieInStudioRela.year) GROUP BY critic_id, studio_id;" +
             #"DROP VIEW IF EXISTS ActorToStudio CASCADE; CREATE VIEW ActorToStudio AS SELECT actor_id, studio_id, COUNT(movie_name) AS movies_num FROM ActorInMovieRela INNER JOIN MovieInStudioRela ON (ActorInMovieRela.movie_name,ActorInMovieRela.year)=(MovieInStudioRela.movie_name,MovieInStudioRela.year) GROUP BY actor_id, studio_id;" +
             "DROP VIEW IF EXISTS ActorToStudio CASCADE; CREATE VIEW ActorToStudio AS SELECT actor_id, studio_id, COUNT(*) AS movies_num FROM ActorInMovieRela INNER JOIN MovieInStudioRela ON (ActorInMovieRela.movie_name,ActorInMovieRela.year)=(MovieInStudioRela.movie_name,MovieInStudioRela.year) GROUP BY actor_id, studio_id;" +
@@ -590,7 +608,7 @@ def studioProducedMovie(studioID: int, movieName: str, movieYear: int, budget: i
     try:
         conn = Connector.DBConnector()
         query = sql.SQL(
-            "INSERT INTO MovieInStudio VALUES({studio_id}, {movie_name}, {year}, {budget}, {revenue})").format(
+            "INSERT INTO MovieInStudioRela VALUES({studio_id}, {movie_name}, {year}, {budget}, {revenue})").format(
             studio_id=sql.Literal(studioID),
             movie_name=sql.Literal(movieName),
             year=sql.Literal(movieYear),
@@ -629,7 +647,7 @@ def studioDidntProduceMovie(studioID: int, movieName: str, movieYear: int) -> Re
     try:
         conn = Connector.DBConnector()
         query = sql.SQL(
-            "DELETE FROM MovieInStudio WHERE studio_name={studio_name} and movie_name={movie_name} and year={year}").format(
+            "DELETE FROM MovieInStudioRela WHERE studio_name={studio_name} and movie_name={movie_name} and year={year}").format(
             studio_name=sql.Literal(studioID), movie_name=sql.Literal(movieName), year=sql.Literal(movieYear))
         rows_effected, _ = conn.execute(query)
         conn.commit()
@@ -726,7 +744,7 @@ def stageCrewBudget(movieName: str, movieYear: int) -> int:  #TODO: I'm not sure
     try:
         conn = Connector.DBConnector()
         query = sql.SQL("SELECT budget - (SELECT SUM(salary) FROM ActorInMovieRela WHERE movie_name={name} AND year={year}) " +
-                        "FROM MovieInStudio WHERE movie_name={name} AND year={year}").format(name=sql.Literal(movieName),
+                        "FROM MovieInStudioRela WHERE movie_name={name} AND year={year}").format(name=sql.Literal(movieName),
                                                                                              year=sql.Literal(movieYear))
         rows_effected, ret_val = conn.execute(query)
         if rows_effected == 0:  # movie not in studio
@@ -768,7 +786,7 @@ def franchiseRevenue() -> List[Tuple[str, int]]:
     try:
         conn = Connector.DBConnector()
         # To check: if I gave revenue default(0), will it give revenue 0 in the joined table for movies without one?
-        query = sql.SQL("SELECT movie_name, COALESCE (revenue,0) FROM (SELECT * FROM MovieTable LEFT OUTER JOIN MovieRevenues) ORDER BY movie_name DESC")
+        query = sql.SQL("SELECT DISTINCT movie_name, COALESCE (revenue,0) FROM (SELECT * FROM MovieTable LEFT OUTER JOIN MovieRevenues) ORDER BY movie_name DESC")
         rows_effected, res = conn.execute(query)
 
         for i in res.rows:
@@ -802,7 +820,7 @@ def getFanCritics() -> List[Tuple[int, int]]:
     conn = None
     final_list = []
     try:
-        # in words: doing inner join between CriticMovie to MovieInStudio to get matching movies. then, we grop the res
+        # in words: doing inner join between CriticMovie to MovieInStudioRela to get matching movies. then, we grop the res
         # by critic_id and studio_id, and now if we count each group movies, we can tell how many movies from that studio
         # the critic rated. we can compare this num to the amount of movies the studio has. if equal - than he is fan.
         conn = Connector.DBConnector()
@@ -842,7 +860,7 @@ def getExclusiveActors() -> List[Tuple[int, int]]:
     conn = None
     final_list = []
     try:
-        # in words: doing inner join between ActorInMovie to MovieInStudio to get matching movies. then, we group the res
+        # in words: doing inner join between ActorInMovie to MovieInStudioRela to get matching movies. then, we group the res
         # by actor_id and studio_id, and now if we count each group movies, we can tell how many movies from that studio
         # the actor palyed in. we can compare this num to the amount of movies the actor played in. if equal - than he is exclusive.
         conn = Connector.DBConnector()
