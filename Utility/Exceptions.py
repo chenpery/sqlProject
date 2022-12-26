@@ -9,22 +9,22 @@ class _Exceptions(Exception):
 # exceptions classes, you can print the exception using print(exception)
 class DatabaseException(_Exceptions):
     class ConnectionInvalid(_Exceptions):
-        pass
+        print(_Exceptions)
 
     class NOT_NULL_VIOLATION(_Exceptions):
-        pass
+        print(_Exceptions)
 
     class FOREIGN_KEY_VIOLATION(_Exceptions):
-        pass
+        print(_Exceptions)
 
     class UNIQUE_VIOLATION(_Exceptions):
-        pass
+        print(_Exceptions)
 
     class CHECK_VIOLATION(_Exceptions):
-        pass
+        print(_Exceptions)
 
     class database_ini_ERROR(_Exceptions):
-        pass
+        print(_Exceptions)
 
     class UNKNOWN_ERROR(_Exceptions):
-        pass
+        print(_Exceptions)
