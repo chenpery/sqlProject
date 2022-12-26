@@ -208,6 +208,14 @@ def deleteCritic(critic_id: int) -> ReturnValue:
     return ReturnValue.OK
 
 
+def createCritic(res: ResultSet) -> Critic:
+    if res.size() == 0:
+        return Critic.badCritic()
+    critic_id = res.cols['critic_id']
+    name = res.cols['name']
+    return Critic(critic_id=critic_id, critic_name=name)
+
+
 def getCriticProfile(critic_id: int) -> Critic:
     conn = None
     critic = Critic()
@@ -220,15 +228,9 @@ def getCriticProfile(critic_id: int) -> Critic:
         return critic.badCritic()
     except Exception:
         return critic.badCritic()
-
     finally:
         conn.close()
-        if res.isEmpty():
-            return critic.badCritic()
-        else:
-            critic.setCriticID(res.cols['critic_id'])
-            critic.setName(res.cols['name'])
-    return critic
+    return createCritic(res)
 
 
 def addActor(actor: Actor) -> ReturnValue:
@@ -281,6 +283,16 @@ def deleteActor(actor_id: int) -> ReturnValue:
     return ReturnValue.OK
 
 
+def createActor(res: ResultSet) -> Actor:
+    if res.size() == 0:
+        return Actor.badActor()
+    actor_id = res.cols['actor_id']
+    name = res.cols['name']
+    age = res.cols['age']
+    height = res.cols['height']
+    return Actor(actor_id=actor_id, actor_name=name, age=age, height=height)
+
+
 def getActorProfile(actor_id: int) -> Actor:
     conn = None
     actor = Actor()
@@ -296,14 +308,7 @@ def getActorProfile(actor_id: int) -> Actor:
 
     finally:
         conn.close()
-        if res.isEmpty():
-            return actor.badActor()
-        else:
-            actor.setActorID(res.cols['actor_id'])
-            actor.setActorName(res.cols['name'])
-            actor.setAge(res.cols['age'])
-            actor.setHeight(res.cols['height'])
-    return actor
+    return createActor(res)
 
 
 def addMovie(movie: Movie) -> ReturnValue:
@@ -358,6 +363,15 @@ def deleteMovie(movie_name: str, year: int) -> ReturnValue:
     return ReturnValue.OK
 
 
+def createMovie(res: ResultSet) -> Movie:
+    if res.size() == 0:
+        return Movie.badMovie()
+    movie_name = res.cols['movie_name']
+    year = res.cols['year']
+    genre = res.cols['genre']
+    return Movie(movie_name=movie_name, year=year,genre=genre)
+
+
 def getMovieProfile(movie_name: str, year: int) -> Movie:
     conn = None
     movie = Movie()
@@ -375,13 +389,7 @@ def getMovieProfile(movie_name: str, year: int) -> Movie:
 
     finally:
         conn.close()
-        if res.isEmpty():
-            return movie.badMovie()
-        else:
-            movie.setMovieName(res.cols['movie_name'])
-            movie.setYear(res.cols['year'])
-            movie.setGenre(res.cols['genre'])
-    return movie
+    return createMovie(res)
 
 
 def addStudio(studio: Studio) -> ReturnValue:
@@ -429,6 +437,13 @@ def deleteStudio(studio_id: int) -> ReturnValue:
         conn.close()
     return ReturnValue.OK
 
+def createStudio(res: ResultSet) -> Studio:
+    if res.size() == 0:
+        return Studio.badStudio()
+    studio_id = res.cols['studio_id']
+    name = res.cols['name']
+    return Studio(studio_id=studio_id, studio_name=name)
+
 
 def getStudioProfile(studio_id: int) -> Studio:
     conn = None
@@ -445,12 +460,7 @@ def getStudioProfile(studio_id: int) -> Studio:
 
     finally:
         conn.close()
-        if res.isEmpty():
-            return studio.badStudio()
-        else:
-            studio.setStudioID(res.cols['studio_id'])
-            studio.setStudioName(res.cols['name'])
-    return studio
+    return createStudio(res)
 
 
 # ---------------------------------- BASIC API: ----------------------------------
