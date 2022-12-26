@@ -177,7 +177,7 @@ def addCritic(critic: Critic) -> ReturnValue:
         return ReturnValue.BAD_PARAMS
     except DatabaseException.UNIQUE_VIOLATION:
         return ReturnValue.ALREADY_EXISTS
-    except DatabaseException.UNKNOWN_ERROR:  # Note - FOREIGN_KEY_VIOLATION not relevant here as it doesn't have one
+    except DatabaseException.UNKNOWN_ERROR:
         return ReturnValue.ERROR
     except Exception:
         return ReturnValue.ERROR
@@ -193,7 +193,7 @@ def deleteCritic(critic_id: int) -> ReturnValue:
         query = sql.SQL("DELETE FROM CriticTable WHERE critic_id={id}").format(id=sql.Literal(critic_id))
         rows_effected, _ = conn.execute(query)
 
-        conn.commit()  # TODO: Do we need it here or only rollback below?
+        conn.commit()
 
         if rows_effected == 0:
             return ReturnValue.NOT_EXISTS
@@ -250,7 +250,7 @@ def addActor(actor: Actor) -> ReturnValue:
         return ReturnValue.BAD_PARAMS
     except DatabaseException.UNIQUE_VIOLATION:
         return ReturnValue.ALREADY_EXISTS
-    except DatabaseException.UNKNOWN_ERROR:  # Note - FOREIGN_KEY_VIOLATION not relevant here as it doesn't have one
+    except DatabaseException.UNKNOWN_ERROR:
         return ReturnValue.ERROR
     except Exception:
         return ReturnValue.ERROR
@@ -265,7 +265,7 @@ def deleteActor(actor_id: int) -> ReturnValue:
         conn = Connector.DBConnector()
         query = sql.SQL("DELETE FROM ActorTable WHERE actor_id={id}").format(id=sql.Literal(actor_id))
         rows_effected, _ = conn.execute(query)
-        conn.commit()  # TODO: Do we need it here or only rollback below?
+        conn.commit()
 
         if rows_effected == 0:
             return ReturnValue.NOT_EXISTS
@@ -324,7 +324,7 @@ def addMovie(movie: Movie) -> ReturnValue:
         return ReturnValue.BAD_PARAMS
     except DatabaseException.UNIQUE_VIOLATION:
         return ReturnValue.ALREADY_EXISTS
-    except DatabaseException.UNKNOWN_ERROR:  # Note - FOREIGN_KEY_VIOLATION not relevant here as it doesn't have one
+    except DatabaseException.UNKNOWN_ERROR:
         return ReturnValue.ERROR
     except Exception:
         return ReturnValue.ERROR
@@ -341,7 +341,7 @@ def deleteMovie(movie_name: str, year: int) -> ReturnValue:
             name=sql.Literal(movie_name),
             year=sql.Literal(year))
         rows_effected, _ = conn.execute(query)
-        conn.commit()  # TODO: Do we need it here or only rollback below?
+        conn.commit()
 
         if rows_effected == 0:
             return ReturnValue.NOT_EXISTS
@@ -400,7 +400,7 @@ def addStudio(studio: Studio) -> ReturnValue:
         return ReturnValue.BAD_PARAMS
     except DatabaseException.UNIQUE_VIOLATION:
         return ReturnValue.ALREADY_EXISTS
-    except DatabaseException.UNKNOWN_ERROR:  # Note - FOREIGN_KEY_VIOLATION not relevant here as it doesn't have one
+    except DatabaseException.UNKNOWN_ERROR:
         return ReturnValue.ERROR
     except Exception:
         return ReturnValue.ERROR
@@ -415,7 +415,7 @@ def deleteStudio(studio_id: int) -> ReturnValue:
         conn = Connector.DBConnector()
         query = sql.SQL("DELETE FROM StudioTable WHERE studio_id={id}").format(id=sql.Literal(studio_id))
         rows_effected, _ = conn.execute(query)
-        conn.commit()  # TODO: Do we need it here or only rollback below?
+        conn.commit()
 
         if rows_effected == 0:
             return ReturnValue.NOT_EXISTS
@@ -477,7 +477,7 @@ def criticRatedMovie(movieName: str, movieYear: int, criticID: int, rating: List
     except DatabaseException.UNIQUE_VIOLATION:
         conn.rollback()
         return ReturnValue.ALREADY_EXISTS
-    except DatabaseException.FOREIGN_KEY_VIOLATION:#TODO
+    except DatabaseException.FOREIGN_KEY_VIOLATION:
         conn.rollback()
         return ReturnValue.NOT_EXISTS
     except Exception:
@@ -517,10 +517,10 @@ def actorPlayedInMovie(movieName: str, movieYear: int, actorID: int, salary: int
     error_occurred = False
     try:
         conn = Connector.DBConnector()
-
-        query = sql.SQL("INSERT INTO ActorInMovieRela (movie_name, year, actor_id, salary) VALUES(\
-                        {movie_name}, {year}, {actor_id}, {salary});\
-                        INSERT INTO ActorRoleInMovieRela (movie_name, year, actor_id, role) VALUES").format(sql.Literal(movieName), sql.Literal(movieYear),
+        # TODO: check if roles is empty list
+        query = sql.SQL("INSERT INTO ActorInMovieRela (movie_name, year, actor_id, salary) VALUES( " +
+                        "{movie_name}, {year}, {actor_id}, {salary}); " +
+                        "INSERT INTO ActorRoleInMovieRela (movie_name, year, actor_id, role) VALUES").format(sql.Literal(movieName), sql.Literal(movieYear),
                                                                                                             sql.Literal(actorID), sql.Literal(salary))
         for i, role in enumerate(roles):
             query += sql.SQL("({movie_name}, {movie_year}, {actor_id}, {role})").format(sql.Literal(movieName), sql.Literal(movieYear),
@@ -533,14 +533,14 @@ def actorPlayedInMovie(movieName: str, movieYear: int, actorID: int, salary: int
 
         if rows_effected == 0:
             return ReturnValue.NOT_EXISTS
-        # TODO: check if roles is empty list
+
     except DatabaseException.NOT_NULL_VIOLATION:
         conn.rollback()
         return ReturnValue.BAD_PARAMS
     except DatabaseException.CHECK_VIOLATION:
         conn.rollback()
         return ReturnValue.BAD_PARAMS
-    except DatabaseException.FOREIGN_KEY_VIOLATION:  # TODO (?)
+    except DatabaseException.FOREIGN_KEY_VIOLATION:
         conn.rollback()
         return ReturnValue.NOT_EXISTS
     except DatabaseException.UNIQUE_VIOLATION:
@@ -562,7 +562,9 @@ def actorDidntPlayInMovie(movieName: str, movieYear: int, actorID: int) -> Retur
     try:
         conn = Connector.DBConnector()
         query = sql.SQL("DELETE FROM ActorInMovieRela WHERE movie_name={name} AND year={year} AND actor_id={id}").format(
-            name=sql.Literal(movieName), year=sql.Literal(movieYear), id=sql.Literal(actorID))
+            name=sql.Literal(movieName),
+            year=sql.Literal(movieYear),
+            id=sql.Literal(actorID))
         rows_effected, _ = conn.execute(query)
         conn.commit()
 
@@ -628,7 +630,7 @@ def studioProducedMovie(studioID: int, movieName: str, movieYear: int, budget: i
     except DatabaseException.UNIQUE_VIOLATION:
         conn.rollback()
         return ReturnValue.ALREADY_EXISTS
-    except DatabaseException.FOREIGN_KEY_VIOLATION:  # TODO
+    except DatabaseException.FOREIGN_KEY_VIOLATION:
         conn.rollback()
         return ReturnValue.NOT_EXISTS
     except DatabaseException:
@@ -688,11 +690,12 @@ def averageRating(movieName: str, movieYear: int) -> float:
         conn.close()
     return ret_val
 
+
 def averageActorRating(actorID: int) -> float:
     conn = None
     ret_val = 0
     try:
-        # in words: in CriticMocieRela we filter the movies the actor played in. then, we group them by name and get avg
+        # in words: in CriticMovieRela we filter the movies the actor played in. then, we group them by name and get avg
         # rating for each movie (as done in previous func). in the end, we return the avg of all movies avg rating.
 
         conn = Connector.DBConnector()
@@ -738,7 +741,7 @@ def bestPerformance(actor_id: int) -> Movie:
             movie.setGenre(res.cols['genre'])
     return movie
 
-def stageCrewBudget(movieName: str, movieYear: int) -> int:  #TODO: I'm not sure if thats the right way to subtract
+def stageCrewBudget(movieName: str, movieYear: int) -> int:  # TODO: I'm not sure if thats the right way to subtract
     conn = None
     ret_val = -1
     try:
@@ -785,7 +788,6 @@ def franchiseRevenue() -> List[Tuple[str, int]]:
     final_list = []
     try:
         conn = Connector.DBConnector()
-        # To check: if I gave revenue default(0), will it give revenue 0 in the joined table for movies without one?
         query = sql.SQL("SELECT DISTINCT movie_name, COALESCE (revenue,0) FROM (SELECT * FROM MovieTable LEFT OUTER JOIN MovieRevenues) ORDER BY movie_name DESC")
         rows_effected, res = conn.execute(query)
 
