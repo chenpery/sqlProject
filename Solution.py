@@ -27,28 +27,29 @@ def createTables():
             "PRIMARY KEY(actor_id), CHECK(actor_id > 0 AND age > 0 AND height > 0));" +
             "DROP TABLE IF EXISTS StudioTable CASCADE; CREATE TABLE StudioTable(studio_id INTEGER NOT NULL, name TEXT NOT NULL," +
             "PRIMARY KEY(studio_id), CHECK(studio_id > 0));" +
-            "DROP TABLE IF EXISTS CriticMovieRela CASCADE; CREATE TABLE CriticMovieRela(critic_id, movie_name, year, rating INTEGER," +
+            "DROP TABLE IF EXISTS CriticMovieRela CASCADE; CREATE TABLE CriticMovieRela(critic_id INTEGER NOT NULL, movie_name TEXT NOT NULL, year INTEGER NOT NULL, rating INTEGER NOT NULL," +
             "FOREIGN KEY(critic_id) REFERENCES CriticTable(critic_id) ON DELETE CASCADE," +
             "FOREIGN KEY(movie_name, year) REFERENCES MovieTable(movie_name, year) ON DELETE CASCADE," +
             "UNIQUE (critic_id, movie_name, year), CHECK(rating >=1 and rating <= 5));" +
-            "DROP TABLE IF EXISTS ActorInMovieRela CASCADE; CREATE TABLE ActorInMovieRela(movie_name, year, actor_id, salary INTEGER," +
+            "DROP TABLE IF EXISTS ActorInMovieRela CASCADE; CREATE TABLE ActorInMovieRela(movie_name TEXT NOT NULL, year INTEGER NOT NULL, actor_id INTEGER NOT NULL, salary INTEGER NOT NULL," +
             "FOREIGN KEY(actor_id) REFERENCES ActorTable(actor_id) ON DELETE CASCADE," +
             "FOREIGN KEY(movie_name,year) REFERENCES MovieTable(movie_name, year) ON DELETE CASCADE," +
             "PRIMARY KEY (movie_name,year,actor_id), CHECK(salary > 0));" +
-            "DROP TABLE IF EXISTS ActorRoleInMovieRela CASCADE; CREATE TABLE ActorRoleInMovieRela(movie_name, year, actor_id, roles TEXT NOT NULL," +
-            "FOREIGN KEY(movie_name, year, actor_id) REFERENCES ActorInMovieRela(movie_name, year, actor_id) ON DELETE CASCADE," +
-            "CHECK(all roles IS NOT NULL));" +
-            "DROP TABLE IF EXISTS MovieInStudioRela CASCADE; CREATE TABLE MovieInStudioRela(studio_it, movie_name, year, budget INTEGER, revenue INTEGER default(0)," +
-            "FOREIGN KEY(studio_it) REFERENCES StudioTable(studio_it) ON DELETE CASCADE," +
+            "DROP TABLE IF EXISTS ActorRoleInMovieRela CASCADE; CREATE TABLE ActorRoleInMovieRela(movie_name TEXT NOT NULL, year INTEGER NOT NULL, actor_id INTEGER NOT NULL, roles TEXT NOT NULL," +
+            "FOREIGN KEY(movie_name, year, actor_id) REFERENCES ActorInMovieRela(movie_name, year, actor_id) ON DELETE CASCADE);" +
+            "DROP TABLE IF EXISTS MovieInStudioRela CASCADE; CREATE TABLE MovieInStudioRela(studio_id  INTEGER NOT NULL, movie_name TEXT NOT NULL, year INTEGER NOT NULL, budget INTEGER, revenue INTEGER default(0)," +
+            "FOREIGN KEY(studio_id) REFERENCES StudioTable(studio_id) ON DELETE CASCADE," +
             "FOREIGN KEY(movie_name,year) REFERENCES MovieTable(movie_name, year) ON DELETE CASCADE," +
-            "UNIQUE (studio_it, movie_name,year), CHECK(budget >= 0), CHECK( revenue >= 0));" +
+            "UNIQUE (studio_id, movie_name,year), CHECK(budget >= 0), CHECK( revenue >= 0));" +
             "DROP VIEW IF EXISTS NumRolesInMovieXActor CASCADE; CREATE VIEW NumRolesInMovieXActor AS SELECT actor_id, movie_name, year, COUNT(roles) AS roles_num FROM ActorRoleInMovieRela GROUP BY actor_id, movie_name, year;" +
             "DROP VIEW IF EXISTS MovieAvgRate CASCADE; CREATE VIEW MovieAvgRate AS SELECT movie_name, year, AVG(rating) FROM CriticMovieRela GROUP BY movie_name, year;" +
             "DROP VIEW IF EXISTS MovieRevenues CASCADE; CREATE VIEW MovieRevenues AS SELECT movie_name, year, SUM(revenue) AS revenue FROM MovieInStudioRela GROUP BY movie_name, year;" +
             "DROP VIEW IF EXISTS StudioRevenues CASCADE; CREATE VIEW StudioRevenues AS SELECT studio_id, year, SUM(revenue) AS revenue FROM MovieInStudioRela GROUP BY studio_id, year;" +
-            "DROP VIEW IF EXISTS CtiticToStudio CASCADE; CREATE VIEW CtiticToStudio AS SELECT critic_id, studio_id, COUNT(movie_name) AS movies_num FROM CriticMovieRela INNER JOIN MovieInStudioRela GROUP BY critic_id, studio_id;" +
-            "DROP VIEW IF EXISTS ActorToStudio CASCADE; CREATE VIEW ActorToStudio AS SELECT actor_id, studio_id, COUNT(movie_name) AS movies_num FROM ActorInMovieRela INNER JOIN MovieInStudioRela GROUP BY actor_id, studio_id;" +
-            "DROP VIEW IF EXISTS ActorsInGenre CASCADE; CREATE VIEW ActorsInGenre AS SELECT DISTINCT actor_id, genre FROM ActorInMovieRela  LEFT OUTER JOIN MovieTable;" +
+            # "DROP VIEW IF EXISTS CtiticToStudio CASCADE; CREATE VIEW CtiticToStudio AS SELECT critic_id, studio_id, COUNT(movie_name) AS movies_num FROM CriticMovieRela INNER JOIN MovieInStudioRela ON (CriticMovieRela.movie_name,CriticMovieRela.year)=(MovieInStudioRela.movie_name,MovieInStudioRela.year) GROUP BY critic_id, studio_id;" +
+            "DROP VIEW IF EXISTS CtiticToStudio CASCADE; CREATE VIEW CtiticToStudio AS SELECT critic_id, studio_id, COUNT(*) AS movies_num FROM CriticMovieRela INNER JOIN MovieInStudioRela ON (CriticMovieRela.movie_name,CriticMovieRela.year)=(MovieInStudioRela.movie_name,MovieInStudioRela.year) GROUP BY critic_id, studio_id;" +
+            #"DROP VIEW IF EXISTS ActorToStudio CASCADE; CREATE VIEW ActorToStudio AS SELECT actor_id, studio_id, COUNT(movie_name) AS movies_num FROM ActorInMovieRela INNER JOIN MovieInStudioRela ON (ActorInMovieRela.movie_name,ActorInMovieRela.year)=(MovieInStudioRela.movie_name,MovieInStudioRela.year) GROUP BY actor_id, studio_id;" +
+            "DROP VIEW IF EXISTS ActorToStudio CASCADE; CREATE VIEW ActorToStudio AS SELECT actor_id, studio_id, COUNT(*) AS movies_num FROM ActorInMovieRela INNER JOIN MovieInStudioRela ON (ActorInMovieRela.movie_name,ActorInMovieRela.year)=(MovieInStudioRela.movie_name,MovieInStudioRela.year) GROUP BY actor_id, studio_id;" +
+            "DROP VIEW IF EXISTS ActorsInGenre CASCADE; CREATE VIEW ActorsInGenre AS SELECT DISTINCT actor_id, genre FROM ActorInMovieRela LEFT OUTER JOIN MovieTable ON (ActorInMovieRela.movie_name,ActorInMovieRela.year)=(MovieTable.movie_name,MovieTable.year);" +
             "COMMIT;"
         )
         conn.commit()
