@@ -514,26 +514,17 @@ def actorPlayedInMovie(movieName: str, movieYear: int, actorID: int, salary: int
         query = sql.SQL("INSERT INTO ActorInMovieRela(movie_name, year, actor_id, salary) VALUES ( " 
                         "{movie_name}, {year}, {actor_id}, {salary}); ").format(movie_name=sql.Literal(movieName), year=sql.Literal(movieYear),
                                                                                                             actor_id=sql.Literal(actorID), salary=sql.Literal(salary))
+
+        for role in roles:
+            query += sql.SQL("INSERT INTO ActorRoleInMovieRela(movie_name, year, actor_id, role) VALUES "
+                             "({movie_name}, {movie_year}, {actor_id}, {role});").format(movie_name=sql.Literal(movieName), movie_year=sql.Literal(movieYear),
+                actor_id=sql.Literal(actorID), role=sql.Literal(role))
+
         rows_effected, _ = conn.execute(query)
         conn.commit()
 
         if rows_effected == 0:
             return ReturnValue.NOT_EXISTS
-        for role in roles:
-            query = sql.SQL("INSERT INTO ActorRoleInMovieRela(movie_name, year, actor_id, role) VALUES "
-                             "({movie_name}, {movie_year}, {actor_id}, {role});").format(movie_name=sql.Literal(movieName), movie_year=sql.Literal(movieYear),
-                actor_id=sql.Literal(actorID), role=sql.Literal(role))
-            rows_effected, _ = conn.execute(query)
-            conn.commit()
-
-            if rows_effected == 0:
-                return ReturnValue.NOT_EXISTS
-
-        # rows_effected, _ = conn.execute(query)
-        # conn.commit()
-        #
-        # if rows_effected == 0:
-        #     return ReturnValue.NOT_EXISTS
 
     except DatabaseException.NOT_NULL_VIOLATION:
         conn.rollback()
@@ -852,7 +843,7 @@ def averageAgeByGenre() -> List[Tuple[str, float]]:
     try:
         conn = Connector.DBConnector()
         query = sql.SQL("SELECT genre, AVG(age) AS age_avg FROM ActorsInGenre LEFT OUTER JOIN ActorTable "
-                        "ON (ActorsInGenre.actor_id)=(ActorTable.actor_id) GROUP BY genre ORDER BY genre DESC ")
+                        "ON (ActorsInGenre.actor_id)=(ActorTable.actor_id) GROUP BY genre")
         rows_effected, res = conn.execute(query)
 
         for i in res.rows:
