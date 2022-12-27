@@ -512,14 +512,18 @@ def actorPlayedInMovie(movieName: str, movieYear: int, actorID: int, salary: int
         conn = Connector.DBConnector()
         # TODO: check if roles is empty list
         query = sql.SQL("INSERT INTO ActorInMovieRela(movie_name, year, actor_id, salary) VALUES ( " 
-                        "{movie_name}, {year}, {actor_id}, {salary}); ").format(movie_name=sql.Literal(movieName), year=sql.Literal(movieYear),
+                        "{movie_name}, {year}, {actor_id}, {salary});"
+                        "INSERT INTO ActorRoleInMovieRela(movie_name, year, actor_id, role) VALUES ").format(movie_name=sql.Literal(movieName), year=sql.Literal(movieYear),
                                                                                                             actor_id=sql.Literal(actorID), salary=sql.Literal(salary))
 
-        for role in roles:
-            query += sql.SQL("INSERT INTO ActorRoleInMovieRela(movie_name, year, actor_id, role) VALUES "
-                             "({movie_name}, {movie_year}, {actor_id}, {role});").format(movie_name=sql.Literal(movieName), movie_year=sql.Literal(movieYear),
+        for i, role in enumerate(roles):
+            query += sql.SQL("({movie_name}, {movie_year}, {actor_id}, {role})").format(movie_name=sql.Literal(movieName), movie_year=sql.Literal(movieYear),
                 actor_id=sql.Literal(actorID), role=sql.Literal(role))
 
+            if i is not (len(roles) -1):
+                query += sql.SQL(", ")
+
+        query += sql.SQL("; ")
         rows_effected, _ = conn.execute(query)
         conn.commit()
 
@@ -541,7 +545,8 @@ def actorPlayedInMovie(movieName: str, movieYear: int, actorID: int, salary: int
     except DatabaseException:
         conn.rollback()
         return ReturnValue.ERROR
-    except Exception:
+    except Exception as e:
+        print(e)
         conn.rollback()
         return ReturnValue.ERROR
     finally:
@@ -729,7 +734,7 @@ def bestPerformance(actor_id: int) -> Movie:
         conn.close()
     return createMovie(res)
 
-def stageCrewBudget(movieName: str, movieYear: int) -> int:  # TODO: I'm not sure if thats the right way to subtract
+def stageCrewBudget(movieName: str, movieYear: int) -> int:
     conn = None
     ret_val = -1
     try:
@@ -739,7 +744,6 @@ def stageCrewBudget(movieName: str, movieYear: int) -> int:  # TODO: I'm not sur
                         "(SELECT MovieTable.movie_name, MovieTable.year, COALESCE(budget, 0) AS budget FROM MovieTable LEFT OUTER JOIN MovieInStudioRela ON (movieTable.movie_name, movieTable.year)=(MovieInStudioRela.movie_name, MovieInStudioRela.year)) T2"
                         " WHERE (T1.movie_name,T1.year)=({name},{year}) AND (T2.movie_name,T2.year)=({name},{year})").format(name=sql.Literal(movieName), year=sql.Literal(movieYear))
 
-        #"SELECT movie_name, year, COALESCE(SUM(salary), 0) AS salary_sum FROM (MovieTable LEFT OUTER JOIN ActorInMovieRela ON (movieTable.movie_name, movieTable.year)=(ActorInMovieRela.movie_name, ActorInMovieRela.year)) T"
         rows_effected, res = conn.execute(query)
         if res.size() < 1:  # movie not in studio
             ret_val = -1
