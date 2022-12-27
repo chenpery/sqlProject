@@ -204,16 +204,15 @@ def createCritic(res: ResultSet) -> Critic:
 
 def getCriticProfile(critic_id: int) -> Critic:
     conn = None
-    critic = Critic()
     try:
         conn = Connector.DBConnector()
         query = sql.SQL("SELECT * From CriticTable WHERE critic_id={id}").format(id=sql.Literal(critic_id))
         rows_effected, res = conn.execute(query)
 
     except DatabaseException:
-        return critic.badCritic()
+        return Critic.badCritic()
     except Exception:
-        return critic.badCritic()
+        return Critic.badCritic()
     finally:
         conn.close()
     return createCritic(res)
@@ -281,16 +280,15 @@ def createActor(res: ResultSet) -> Actor:
 
 def getActorProfile(actor_id: int) -> Actor:
     conn = None
-    actor = Actor()
     try:
         conn = Connector.DBConnector()
         query = sql.SQL("SELECT * From ActorTable WHERE actor_id={id}").format(id=sql.Literal(actor_id))
         rows_effected, res = conn.execute(query)
 
     except DatabaseException:
-        return actor.badActor()
+        return Actor.badActor()
     except Exception:
-        return actor.badActor()
+        return Actor.badActor()
 
     finally:
         conn.close()
@@ -360,7 +358,6 @@ def createMovie(res: ResultSet) -> Movie:
 
 def getMovieProfile(movie_name: str, year: int) -> Movie:
     conn = None
-    movie = Movie()
     try:
         conn = Connector.DBConnector()
         query = sql.SQL("SELECT * From MovieTable WHERE movie_name={name} and year={year}").format(
@@ -369,9 +366,9 @@ def getMovieProfile(movie_name: str, year: int) -> Movie:
         rows_effected, res = conn.execute(query)
 
     except DatabaseException:
-        return movie.badMovie()
+        return Movie.badMovie()
     except Exception:
-        return movie.badMovie()
+        return Movie.badMovie()
 
     finally:
         conn.close()
@@ -433,16 +430,15 @@ def createStudio(res: ResultSet) -> Studio:
 
 def getStudioProfile(studio_id: int) -> Studio:
     conn = None
-    studio = Studio()
     try:
         conn = Connector.DBConnector()
         query = sql.SQL("SELECT * From StudioTable WHERE studio_id={id}").format(id=sql.Literal(studio_id))
         rows_effected, res = conn.execute(query)
 
     except DatabaseException:
-        return studio.badStudio()
+        return Studio.badStudio()
     except Exception:
-        return studio.badStudio()
+        return Studio.badStudio()
 
     finally:
         conn.close()
@@ -681,7 +677,7 @@ def averageRating(movieName: str, movieYear: int) -> float:
             year=sql.Literal(movieYear))
         rows_effected, res = conn.execute(query)
 
-        if rows_effected:
+        if rows_effected and res[0]['rating_avg']:
             ret_val = res[0]['rating_avg']
 
     except DatabaseException:
@@ -699,19 +695,19 @@ def averageActorRating(actorID: int) -> float:
     try:
         # in words: in CriticMovieRela we filter the movies the actor played in. then, we group them by name and get avg
         # rating for each movie (as done in previous func). in the end, we return the avg of all movies avg rating.
-
         conn = Connector.DBConnector()
-        query = sql.SQL("SELECT AVG(rating_avg) FROM MovieAvgRate WHERE (movie_name, year)= "
-                        "(SELECT movie_name, year FROM ActorInMovieRela WHERE actor_id={id})").format(id=sql.Literal(actorID))
+        query = sql.SQL("SELECT AVG(rating_avg) FROM MovieAvgRate INNER JOIN (SELECT movie_name, year FROM ActorInMovieRela WHERE actor_id={id}) AS table2"
+                        " ON table2.year = MovieAvgRate.year and table2.movie_name= MovieAvgRate.movie_name; ").format(id=sql.Literal(actorID))
 
         rows_effected, res = conn.execute(query)
 
-        if rows_effected:
+        if rows_effected and res[0]['avg']:
             ret_val = res[0]['avg']
 
     except DatabaseException:
         ret_val = 0
-    except Exception:
+    except Exception as e:
+        print(e)
         ret_val = 0
     finally:
         conn.close()
@@ -720,29 +716,25 @@ def averageActorRating(actorID: int) -> float:
 
 def bestPerformance(actor_id: int) -> Movie:
     conn = None
-    movie = Movie()
     try:
         # in words: in CriticMovieRela we filter the movies the actor played in. then, we group them by name and get avg
         # rating for each movie (as done in previous func). in the end, we order them by rating, year and name, and return movie with max rating.
 
         conn = Connector.DBConnector()
-        query = sql.SQL("SELECT movie_name, year, MAX(rating_avg) FROM MovieAvgRate WHERE (movie_name,year)=" +        #movie with max rating
-                        "(SELECT movie_name, year FROM ActorInMovieRela WHERE actor_id={id})" +                     #movies actor palys in
-                        " ORDER BY rating_avg DESC, year ASC, movie_name DESC").format(id=sql.Literal(actor_id))
+        query = sql.SQL("SELECT table2.movie_name, table2.year, genre, MAX(rating_avg) FROM "
+                        "(SELECT table1.movie_name, table1.year, rating_avg From "
+                        "(SELECT movie_name, year FROM actorinmovierela WHERE actor_id={id}) as table1 "
+                        "INNER JOIN movieavgrate ON table1.movie_name=movieavgrate.movie_name and table1.year=movieavgrate.year) as table2 "
+                        "INNER JOIN movietable ON movietable.movie_name=table2.movie_name and table2.year=movietable.year "
+                        "GROUP BY table2.movie_name, table2.year, genre ORDER BY max DESC, table2.year ASC, table2.movie_name DESC LIMIT 1; ")\
+            .format(id=sql.Literal(actor_id))
         rows_effected, res = conn.execute(query)
-        assert len(res.rows) <= 1  # TODO: delete after testing
 
     except DatabaseException:
-        return movie.badMovie()
+        return Movie.badMovie()
     finally:
         conn.close()
-        if res.isEmpty():
-            return movie.badMovie()
-        else:
-            movie.setMovieName(res[0]['movie_name'])
-            movie.setYear(res[0]['year'])
-            movie.setGenre(res[0]['genre'])
-    return movie
+    return createMovie(res)
 
 def stageCrewBudget(movieName: str, movieYear: int) -> int:  # TODO: I'm not sure if thats the right way to subtract
     conn = None
