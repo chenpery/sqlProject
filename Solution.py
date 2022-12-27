@@ -756,23 +756,25 @@ def stageCrewBudget(movieName: str, movieYear: int) -> int:  # TODO: I'm not sur
 
 def overlyInvestedInMovie(movie_name: str, movie_year: int, actor_id: int) -> bool:
     conn = None
-    ret_value = True
     try:
         conn = Connector.DBConnector()
-        query = sql.SQL("SELECT * FROM \
-                        (SELECT movie_name, year, SUM(roles_num) AS sum_roles FROM NumRolesInMovieXActor WHERE movie_name={movie_name} AND year={year} AND actor_id<>{actor}) T1, \
-                        (SELECT movie_name, year, SUM(roles_num) AS sum_roles FROM NumRolesInMovieXActor WHERE movie_name={movie_name} AND year={year} AND actor_id={actor}) T2 \
-                        WHERE T1.not_actor_sum < T2.actor_sum")
+        query = sql.SQL("SELECT (SELECT COUNT(*) FROM ActorRoleInMovieRela WHERE movie_name={movie_name} and year={movie_year}) - "
+                        "((SELECT COUNT(*) FROM ActorRoleInMovieRela WHERE"
+                        " movie_name={movie_name} and year={movie_year} and actor_id={actor_id})*2) as overly")\
+            .format(movie_name=sql.Literal(movie_name), movie_year=sql.Literal(movie_year), actor_id=sql.Literal(actor_id))
         rows_effected, res = conn.execute(query)
-        if res.isEmpty():  # TODO: should we check if value is None instead?
-            ret_value = False
+
+        if res[0]['overly'] < 0: #TODO : CHECK IF IT'S WORK FOR EQUAL
+            return True
+        else:
+            return False
+
     except DatabaseException.UNKNOWN_ERROR as e:
-        res_val = False
+        return False
     except DatabaseException:
-        res_val = False
+        return False
     finally:
         conn.close()
-    return ret_value
 
 
 # ---------------------------------- ADVANCED API: ----------------------------------
