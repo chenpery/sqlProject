@@ -59,7 +59,7 @@ def createTables():
             "FOREIGN KEY(movie_name,year) REFERENCES MovieTable(movie_name, year) ON DELETE CASCADE," 
             "UNIQUE(movie_name,year), CHECK(budget >= 0), CHECK( revenue >= 0));" 
             # VIEWS
-            "DROP VIEW IF EXISTS NumRolesInMovieXActor CASCADE; CREATE VIEW NumRolesInMovieXActor AS SELECT actor_id, movie_name, year, COUNT(role) AS roles_num FROM ActorRoleInMovieRela GROUP BY actor_id, movie_name, year;" 
+            "DROP VIEW IF EXISTS NumRolesInMovieXActor CASCADE; CREATE VIEW NumRolesInMovieXActor AS SELECT actor_id, movie_name, year, COALESCE(COUNT(role),0) AS roles_num FROM ActorRoleInMovieRela GROUP BY actor_id, movie_name, year;" 
             "DROP VIEW IF EXISTS MovieAvgRate CASCADE; CREATE VIEW MovieAvgRate AS SELECT movie_name, year, AVG(rating) AS rating_avg FROM CriticMovieRela GROUP BY movie_name, year;" 
             "DROP VIEW IF EXISTS MovieRevenues CASCADE; CREATE VIEW MovieRevenues AS SELECT movie_name, SUM(revenue) AS revenue FROM MovieInStudioRela GROUP BY movie_name;" 
             "DROP VIEW IF EXISTS StudioRevenues CASCADE; CREATE VIEW StudioRevenues AS SELECT studio_id, year, SUM(revenue) AS revenue FROM MovieInStudioRela GROUP BY studio_id, year;" 
@@ -510,7 +510,9 @@ def actorPlayedInMovie(movieName: str, movieYear: int, actorID: int, salary: int
     conn = None
     try:
         conn = Connector.DBConnector()
-        # TODO: check if roles is empty list
+        if len(roles) == 0:
+            return ReturnValue.BAD_PARAMS
+
         query = sql.SQL("INSERT INTO ActorInMovieRela(movie_name, year, actor_id, salary) VALUES ( " 
                         "{movie_name}, {year}, {actor_id}, {salary});"
                         "INSERT INTO ActorRoleInMovieRela(movie_name, year, actor_id, role) VALUES ").format(movie_name=sql.Literal(movieName), year=sql.Literal(movieYear),
@@ -694,8 +696,9 @@ def averageActorRating(actorID: int) -> float:
         # in words: in CriticMovieRela we filter the movies the actor played in. then, we group them by name and get avg
         # rating for each movie (as done in previous func). in the end, we return the avg of all movies avg rating.
         conn = Connector.DBConnector()
-        query = sql.SQL("SELECT AVG(rating_avg) FROM MovieAvgRate INNER JOIN (SELECT movie_name, year FROM ActorInMovieRela WHERE actor_id={id}) AS table2"
-                        " ON table2.year = MovieAvgRate.year and table2.movie_name= MovieAvgRate.movie_name; ").format(id=sql.Literal(actorID))
+        query = sql.SQL("SELECT AVG(rating_avg) FROM (SELECT table2.movie_name, table2.year, COALESCE(rating_avg, 0) AS rating_avg FROM "
+                        "MovieAvgRate RIGHT OUTER JOIN (SELECT movie_name, year FROM ActorInMovieRela WHERE actor_id={id}) AS table2"
+                        " ON table2.year = MovieAvgRate.year and table2.movie_name= MovieAvgRate.movie_name) T; ").format(id=sql.Literal(actorID))
 
         rows_effected, res = conn.execute(query)
 
@@ -756,18 +759,20 @@ def stageCrewBudget(movieName: str, movieYear: int) -> int:
         conn.close()
         return ret_val
 
-
 def overlyInvestedInMovie(movie_name: str, movie_year: int, actor_id: int) -> bool:
     conn = None
+    ret_value = True
     try:
         conn = Connector.DBConnector()
-        query = sql.SQL("SELECT (SELECT COUNT(*) FROM ActorRoleInMovieRela WHERE movie_name={movie_name} and year={movie_year}) - "
-                        "((SELECT COUNT(*) FROM ActorRoleInMovieRela WHERE"
-                        " movie_name={movie_name} and year={movie_year} and actor_id={actor_id})*2) as overly")\
-            .format(movie_name=sql.Literal(movie_name), movie_year=sql.Literal(movie_year), actor_id=sql.Literal(actor_id))
+        query = sql.SQL(
+            "SELECT (SELECT COUNT(*) FROM ActorRoleInMovieRela WHERE movie_name={movie_name} and year={movie_year}) - "
+            "((SELECT COUNT(*) FROM ActorRoleInMovieRela WHERE"
+            " movie_name={movie_name} and year={movie_year} and actor_id={actor_id})*2) as overly") \
+            .format(movie_name=sql.Literal(movie_name), movie_year=sql.Literal(movie_year),
+                    actor_id=sql.Literal(actor_id))
         rows_effected, res = conn.execute(query)
 
-        if res[0]['overly'] < 0: #TODO : CHECK IF IT'S WORK FOR EQUAL
+        if res[0]['overly'] < 0:  # TODO : CHECK IF IT'S WORK FOR EQUAL
             return True
         else:
             return False
@@ -778,6 +783,7 @@ def overlyInvestedInMovie(movie_name: str, movie_year: int, actor_id: int) -> bo
         return False
     finally:
         conn.close()
+    return ret_value
 
 
 # ---------------------------------- ADVANCED API: ----------------------------------
@@ -847,7 +853,7 @@ def averageAgeByGenre() -> List[Tuple[str, float]]:
     try:
         conn = Connector.DBConnector()
         query = sql.SQL("SELECT genre, AVG(age) AS age_avg FROM ActorsInGenre LEFT OUTER JOIN ActorTable "
-                        "ON (ActorsInGenre.actor_id)=(ActorTable.actor_id) GROUP BY genre ORDER BY genre DESC")
+                        "ON (ActorsInGenre.actor_id)=(ActorTable.actor_id) GROUP BY genre ORDER BY genre ASC")
         rows_effected, res = conn.execute(query)
 
         for i in res.rows:
@@ -870,7 +876,7 @@ def getExclusiveActors() -> List[Tuple[int, int]]:
         # the actor palyed in. we can compare this num to the amount of movies the actor played in. if equal - than he is exclusive.
         conn = Connector.DBConnector()
         query = sql.SQL("SELECT actor_id, studio_id FROM ActorToStudio WHERE (actor_id,movies_num) IN  \
-                        (SELECT actor_id, COUNT(movie_name) FROM ActorInMovieRela GROUP BY actor_id ORDER BY actor_id DESC )")
+                        (SELECT actor_id, COUNT(movie_name) FROM ActorInMovieRela GROUP BY actor_id ORDER BY actor_id DESC)")
         rows_effected, res = conn.execute(query)
 
         for i in res.rows:
