@@ -67,7 +67,8 @@ def createTables():
             "DROP VIEW IF EXISTS CtiticToStudio CASCADE; CREATE VIEW CtiticToStudio AS SELECT critic_id, studio_id, COUNT(*) AS movies_num FROM CriticMovieRela INNER JOIN MovieInStudioRela ON (CriticMovieRela.movie_name,CriticMovieRela.year)=(MovieInStudioRela.movie_name,MovieInStudioRela.year) GROUP BY critic_id, studio_id;" 
             #"DROP VIEW IF EXISTS ActorToStudio CASCADE; CREATE VIEW ActorToStudio AS SELECT actor_id, studio_id, COUNT(movie_name) AS movies_num FROM ActorInMovieRela INNER JOIN MovieInStudioRela ON (ActorInMovieRela.movie_name,ActorInMovieRela.year)=(MovieInStudioRela.movie_name,MovieInStudioRela.year) GROUP BY actor_id, studio_id;" +
             "DROP VIEW IF EXISTS ActorToStudio CASCADE; CREATE VIEW ActorToStudio AS SELECT actor_id, studio_id, COUNT(*) AS movies_num FROM ActorInMovieRela INNER JOIN MovieInStudioRela ON (ActorInMovieRela.movie_name,ActorInMovieRela.year)=(MovieInStudioRela.movie_name,MovieInStudioRela.year) GROUP BY actor_id, studio_id;" 
-            "DROP VIEW IF EXISTS ActorsInGenre CASCADE; CREATE VIEW ActorsInGenre AS SELECT DISTINCT actor_id, genre FROM ActorInMovieRela LEFT OUTER JOIN MovieTable ON (ActorInMovieRela.movie_name,ActorInMovieRela.year)=(MovieTable.movie_name,MovieTable.year);" +
+            "DROP VIEW IF EXISTS ActorsInGenre CASCADE; CREATE VIEW ActorsInGenre AS SELECT DISTINCT actor_id, genre FROM ActorInMovieRela LEFT OUTER JOIN MovieTable ON (ActorInMovieRela.movie_name,ActorInMovieRela.year)=(MovieTable.movie_name,MovieTable.year);"
+            "DROP VIEW IF EXISTS PMoviesSalary CASCADE; CREATE VIEW PMoviesSalary AS SELECT movie_name, year, SUM(salary) FROM ActorInMovieRela GROUP BY movie_name, year;"
             "COMMIT;"
         )
         conn.commit()
@@ -128,6 +129,7 @@ def dropTables():
                      "DROP VIEW IF EXISTS StudioRevenues CASCADE;" +
                      "DROP VIEW IF EXISTS CtiticToStudio CASCADE;" +
                      "DROP VIEW IF EXISTS ActorToStudio CASCADE;" +
+                     "DROP VIEW IF EXISTS PMoviesSalary CASCADE;" +
                      "DROP VIEW IF EXISTS ActorsInGenre CASCADE; COMMIT;")
         conn.commit()
     except DatabaseException.ConnectionInvalid as e:
@@ -741,13 +743,19 @@ def stageCrewBudget(movieName: str, movieYear: int) -> int:  # TODO: I'm not sur
     ret_val = -1
     try:
         conn = Connector.DBConnector()
-        query = sql.SQL("SELECT budget - (SELECT SUM(salary) FROM ActorInMovieRela WHERE movie_name={name} AND year={year}) " +
-                        "FROM MovieInStudioRela WHERE movie_name={name} AND year={year}").format(name=sql.Literal(movieName),
-                                                                                             year=sql.Literal(movieYear))
-        rows_effected, ret_val = conn.execute(query)
-        if rows_effected == 0:  # movie not in studio
-            ret_val = 0
-    except DatabaseException:  # movie doesn't exist
+        query = sql.SQL("SELECT COALESCE(T2.budget - T1.salary, -1) AS final FROM "
+                        "(SELECT MovieTable.movie_name, MovieTable.year, COALESCE(SUM(salary), 0) AS salary FROM MovieTable LEFT OUTER JOIN ActorInMovieRela ON (movieTable.movie_name, movieTable.year)=(ActorInMovieRela.movie_name, ActorInMovieRela.year) GROUP BY MovieTable.movie_name, MovieTable.year) T1,"
+                        "(SELECT MovieTable.movie_name, MovieTable.year, COALESCE(budget, 0) AS budget FROM MovieTable LEFT OUTER JOIN MovieInStudioRela ON (movieTable.movie_name, movieTable.year)=(MovieInStudioRela.movie_name, MovieInStudioRela.year)) T2"
+                        " WHERE (T1.movie_name,T1.year)=({name},{year}) AND (T2.movie_name,T2.year)=({name},{year})").format(name=sql.Literal(movieName), year=sql.Literal(movieYear))
+
+        #"SELECT movie_name, year, COALESCE(SUM(salary), 0) AS salary_sum FROM (MovieTable LEFT OUTER JOIN ActorInMovieRela ON (movieTable.movie_name, movieTable.year)=(ActorInMovieRela.movie_name, ActorInMovieRela.year)) T"
+        rows_effected, res = conn.execute(query)
+        if res.size() < 1:  # movie not in studio
+            ret_val = -1
+        else:
+            ret_val = res[0]['final']
+    except Exception as e:  # movie doesn't exist
+        print(e)
         ret_val = -1
     finally:
         conn.close()
@@ -785,17 +793,18 @@ def franchiseRevenue() -> List[Tuple[str, int]]:
     final_list = []
     try:
         conn = Connector.DBConnector()
-        query = sql.SQL("SELECT DISTINCT movie_name, COALESCE (revenue,0) FROM (SELECT * FROM MovieTable LEFT OUTER JOIN MovieRevenues) ORDER BY movie_name DESC")
+        query = sql.SQL("SELECT DISTINCT T.movie_name, COALESCE(revenue,0) AS revenue FROM "
+                        "(SELECT MovieTable.movie_name, revenue FROM MovieTable LEFT OUTER JOIN MovieRevenues ON (movieTable.movie_name)=(MovieRevenues.movie_name)) T ORDER BY movie_name DESC")
         rows_effected, res = conn.execute(query)
 
         for i in res.rows:
-            final_list.append(i)  # TODO: need to ensure it returns line i in format: (movie_name, revenues)
-    #  TODO: do we need to handle errors?
+            final_list.append(i)
+
     except DatabaseException as e:  # shouldn't get here
         print(e)
     finally:
         conn.close()
-        return final_list
+    return final_list
 
 
 def studioRevenueByYear() -> List[Tuple[int, int, int]]:
@@ -807,12 +816,12 @@ def studioRevenueByYear() -> List[Tuple[int, int, int]]:
         rows_effected, res = conn.execute(query)
 
         for i in res.rows:
-            final_list.append(res[i])
+            final_list.append(i)
     except DatabaseException as e:  # shouldn't get here
         print(e)
     finally:
         conn.close()
-        return final_list
+    return final_list
 
 
 def getFanCritics() -> List[Tuple[int, int]]:
@@ -823,17 +832,18 @@ def getFanCritics() -> List[Tuple[int, int]]:
         # by critic_id and studio_id, and now if we count each group movies, we can tell how many movies from that studio
         # the critic rated. we can compare this num to the amount of movies the studio has. if equal - than he is fan.
         conn = Connector.DBConnector()
-        query = sql.SQL("SELECT critic_id, studio_id FROM CtiticToStudio WHERE (studio_id,movies_num)=(SELECT studio_id, COUNT(movie_name) FROM MovieInStudioRela GROUP BY studio_id)")
+        query = sql.SQL("SELECT critic_id, studio_id FROM CtiticToStudio WHERE (studio_id,movies_num) IN "
+                        "(SELECT studio_id, COUNT(movie_name) FROM MovieInStudioRela GROUP BY studio_id) ORDER BY critic_id DESC, studio_id DESC")
         rows_effected, res = conn.execute(query)
 
         for i in res.rows:
-            final_list.append(res[i])
+            final_list.append(i)
 
     except DatabaseException.UNKNOWN_ERROR as e:  # shouldn't get here
         print(e)
     finally:
         conn.close()
-        return final_list
+    return final_list
 
 
 def averageAgeByGenre() -> List[Tuple[str, float]]:
@@ -841,17 +851,18 @@ def averageAgeByGenre() -> List[Tuple[str, float]]:
     final_list = []
     try:
         conn = Connector.DBConnector()
-        query = sql.SQL("SELECT genre, AVG(age) AS age_avg FROM ActorsInGenre LEFT OUTER JOIN ActorTable GROUP BY genre")
+        query = sql.SQL("SELECT genre, AVG(age) AS age_avg FROM ActorsInGenre LEFT OUTER JOIN ActorTable "
+                        "ON (ActorsInGenre.actor_id)=(ActorTable.actor_id) GROUP BY genre ORDER BY genre DESC ")
         rows_effected, res = conn.execute(query)
 
         for i in res.rows:
-            final_list.append(res[i])
+            final_list.append(i)
 
     except DatabaseException.UNKNOWN_ERROR as e:  # shouldn't get here
         print(e)
     finally:
         conn.close()
-        return final_list
+    return final_list
 
 
 
@@ -863,17 +874,17 @@ def getExclusiveActors() -> List[Tuple[int, int]]:
         # by actor_id and studio_id, and now if we count each group movies, we can tell how many movies from that studio
         # the actor palyed in. we can compare this num to the amount of movies the actor played in. if equal - than he is exclusive.
         conn = Connector.DBConnector()
-        query = sql.SQL("SELECT actor_id, studio_id FROM ActorToStudio WHERE (actor_id,movies_num)= \
-                        (SELECT actor_id, COUNT(movie_name) FROM ActorInMovieRela GROUP BY actor_id)")
+        query = sql.SQL("SELECT actor_id, studio_id FROM ActorToStudio WHERE (actor_id,movies_num) IN  \
+                        (SELECT actor_id, COUNT(movie_name) FROM ActorInMovieRela GROUP BY actor_id ORDER BY actor_id DESC )")
         rows_effected, res = conn.execute(query)
 
         for i in res.rows:
-            final_list.append(res[i])
+            final_list.append(i)
 
     except DatabaseException.UNKNOWN_ERROR as e:  # shouldn't get here
         print(e)
     finally:
         conn.close()
-        return final_list
+    return final_list
 
 # GOOD LUCK!
