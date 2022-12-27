@@ -847,7 +847,7 @@ def averageAgeByGenre() -> List[Tuple[str, float]]:
     try:
         conn = Connector.DBConnector()
         query = sql.SQL("SELECT genre, AVG(age) AS age_avg FROM ActorsInGenre LEFT OUTER JOIN ActorTable "
-                        "ON (ActorsInGenre.actor_id)=(ActorTable.actor_id) GROUP BY genre")
+                        "ON (ActorsInGenre.actor_id)=(ActorTable.actor_id) GROUP BY genre ORDER BY genre DESC")
         rows_effected, res = conn.execute(query)
 
         for i in res.rows:
